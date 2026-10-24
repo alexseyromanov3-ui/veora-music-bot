@@ -19,6 +19,7 @@ COPY alembic ./alembic
 COPY src ./src
 COPY frontend ./frontend
 COPY pic ./pic
+COPY musicbot.db .
 
 # Создание каталогов для медиафайлов
 RUN mkdir -p media/audio media/covers media/temp pic

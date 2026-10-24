@@ -129,6 +129,7 @@ class TrackService:
                 telegram_file_id=telegram_file_id,
                 telegram_file_unique_id=telegram_file_unique_id,
                 uploader_id=uploader_id,
+                is_private=False,
             )
             session.add(track)
             await session.commit()

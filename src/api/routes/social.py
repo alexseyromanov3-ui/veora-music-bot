@@ -1,8 +1,8 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.api.dependencies import get_current_user
+from src.api.dependencies import get_current_user, get_optional_user
 from src.database.session import get_db
 from src.models import Track, User, UserTrack
 from src.schemas.social import FriendConnectRequest, FriendResponse
@@ -63,24 +63,33 @@ async def connect_friend(
 
 @router.get("/friends", response_model=List[FriendResponse])
 async def list_friends(
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[FriendResponse]:
     """Список друзей текущего пользователя."""
-    return await friend_service.get_user_friends(session=db, user_id=user.id)
+    if not user:
+        await db.close()
+        return []
+    res = await friend_service.get_user_friends(session=db, user_id=user.id)
+    await db.close()
+    return res
 
 
 @router.get("/friends/tracks", response_model=TrackListResponse)
 async def list_friends_tracks(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> TrackListResponse:
     """Треки, загруженные друзьями пользователя."""
+    if not user:
+        await db.close()
+        return TrackListResponse(items=[], total=0, offset=offset, limit=limit)
     items, total = await friend_service.get_friends_tracks(
         session=db, user_id=user.id, offset=offset, limit=limit
     )
+    await db.close()
     return TrackListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
@@ -100,17 +109,18 @@ async def remove_friend(
 async def list_community_feed(
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> TrackListResponse:
     """Общая лента сообщества: публичные треки от всех пользователей."""
+    public_filter = or_(Track.is_private == False, Track.is_private.is_(None))
     base_stmt = (
         select(Track, User.first_name, User.username)
         .outerjoin(User, User.id == Track.uploader_id)
-        .where(Track.is_private == False)
+        .where(public_filter)
     )
 
-    count_stmt = select(func.count(Track.id)).where(Track.is_private == False)
+    count_stmt = select(func.count(Track.id)).where(public_filter)
     total = (await db.execute(count_stmt)).scalar_one()
 
     tracks_stmt = base_stmt.order_by(Track.created_at.desc()).offset(offset).limit(limit)
@@ -118,7 +128,7 @@ async def list_community_feed(
 
     # Проверка избранного
     fav_ids = set()
-    if rows:
+    if rows and user:
         track_ids = [t.id for t, _, _ in rows]
         fav_stmt = select(UserTrack.track_id).where(
             UserTrack.user_id == user.id,
@@ -143,7 +153,7 @@ async def list_community_feed(
             stream_url=f"/api/tracks/{t.id}/stream",
             download_url=f"/api/tracks/{t.id}/download",
             is_favorite=(t.id in fav_ids),
-            is_private=t.is_private,
+            is_private=t.is_private or False,
             uploader_id=t.uploader_id,
             uploader_name=f"@{u_name}" if u_name else (f_name or "Сообщество"),
             created_at=t.created_at,
@@ -151,16 +161,23 @@ async def list_community_feed(
         for t, f_name, u_name in rows
     ]
 
+    await db.close()
     return TrackListResponse(items=items, total=total, offset=offset, limit=limit)
 
 
 @router.get("/recommendations", response_model=List[TrackResponse])
 async def get_smart_recommendations(
     limit: int = Query(25, ge=1, le=50),
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[TrackResponse]:
     """Персональные рекомендации «Для вас» на основе музыкального вкуса."""
-    return await recommendation_service.get_recommendations_for_user(
+    if not user:
+        feed = await list_community_feed(offset=0, limit=limit, user=None, db=db)
+        return feed.items
+
+    result = await recommendation_service.get_recommendations_for_user(
         session=db, user_id=user.id, limit=limit
     )
+    await db.close()
+    return result

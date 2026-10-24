@@ -2,7 +2,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.api.dependencies import get_current_user
+from src.api.dependencies import get_current_user, get_optional_user
 from src.database.session import get_db
 from src.models import Track, User, UserTrack
 from src.schemas.track import TrackListResponse, TrackResponse
@@ -15,10 +15,14 @@ async def get_my_library(
     favorites_only: bool = Query(False, description="Только избранные треки"),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> TrackListResponse:
     """Возвращает персональную библиотеку треков текущего пользователя."""
+    if not user:
+        await db.close()
+        return TrackListResponse(items=[], total=0, offset=offset, limit=limit)
+
     stmt = (
         select(Track, UserTrack.is_favorite)
         .join(UserTrack, UserTrack.track_id == Track.id)
@@ -62,6 +66,7 @@ async def get_my_library(
         for t, is_fav in rows
     ]
 
+    await db.close()
     return TrackListResponse(items=items, total=total, offset=offset, limit=limit)
 
 

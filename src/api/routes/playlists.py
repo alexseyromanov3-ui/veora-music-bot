@@ -1,7 +1,7 @@
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from src.api.dependencies import get_current_user
+from src.api.dependencies import get_current_user, get_optional_user
 from src.database.session import get_db
 from src.models import User
 from src.schemas.playlist import (
@@ -23,22 +23,30 @@ async def create_playlist(
     db: AsyncSession = Depends(get_db),
 ) -> PlaylistResponse:
     """Создание нового плейлиста."""
-    return await playlist_service.create_playlist(
+    res = await playlist_service.create_playlist(
         session=db,
         user_id=user.id,
         title=payload.title,
         description=payload.description,
         is_public=payload.is_public,
     )
+    await db.close()
+    return res
 
 
 @router.get("", response_model=List[PlaylistResponse])
 async def list_my_playlists(
-    user: User = Depends(get_current_user),
+    user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
 ) -> List[PlaylistResponse]:
     """Список плейлистов текущего пользователя."""
-    return await playlist_service.get_user_playlists(session=db, user_id=user.id)
+    if not user:
+        await db.close()
+        return []
+
+    res = await playlist_service.get_user_playlists(session=db, user_id=user.id)
+    await db.close()
+    return res
 
 
 @router.get("/{playlist_id}", response_model=PlaylistDetailResponse)

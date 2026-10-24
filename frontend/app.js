@@ -71,11 +71,64 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  async function loadHubTracks() {
+    const hubContainer = document.getElementById('hub-tracks-list');
+    const hubCount = document.getElementById('hub-tracks-count');
+    if (!hubContainer) return;
+
+    try {
+      const resp = await fetch('/api/tracks?limit=30', { headers: getAuthHeaders() });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const allTracks = Array.isArray(data) ? data : (data.items || []);
+
+      if (hubCount) hubCount.textContent = allTracks.length;
+      if (allTracks.length === 0) {
+        hubContainer.innerHTML = '<div class="hub-empty-hint">Загрузите аудиофайлы боту в чат или найдите через SoundCloud!</div>';
+        return;
+      }
+
+      const curTrack = (typeof player !== 'undefined' && player?.getCurrentTrack) ? player.getCurrentTrack() : null;
+
+      hubContainer.innerHTML = '';
+      allTracks.forEach((track, index) => {
+        const isPlaying = curTrack && curTrack.id === track.id;
+        const item = document.createElement('div');
+        item.className = `hub-track-item ${isPlaying ? 'playing' : ''}`;
+        const coverHtml = track.cover_url
+          ? `<img src="${track.cover_url}" alt="cover" />`
+          : '🎵';
+
+        item.innerHTML = `
+          <div class="hub-track-cover">${coverHtml}</div>
+          <div class="hub-track-details">
+            <div class="hub-track-title">${escapeHtml(track.title)}</div>
+            <div class="hub-track-artist">${escapeHtml(track.artist)}</div>
+          </div>
+          <div class="hub-track-actions">
+            <span class="hub-track-duration">${track.duration ? formatTime(track.duration) : ''}</span>
+            <button class="hub-play-btn" title="Играть">${isPlaying && player?.isPlaying ? '⏸' : '▶️'}</button>
+          </div>
+        `;
+
+        item.addEventListener('click', () => {
+          if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
+          player.setQueue(allTracks, index);
+        });
+
+        hubContainer.appendChild(item);
+      });
+    } catch (e) {
+      console.warn('Ошибка загрузки треков для главного экрана:', e);
+    }
+  }
+
   function openWheelMenu() {
     activeView = 'wheel';
     if (viewCs2Hub) viewCs2Hub.classList.remove('hidden');
     if (viewSectionTracks) viewSectionTracks.classList.add('hidden');
     updateHubPreview(null);
+    loadHubTracks();
     if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
   }
 
@@ -150,6 +203,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     btnBackToWheel.addEventListener('click', (e) => {
       e.preventDefault();
       openWheelMenu();
+    });
+  }
+
+  const btnHubOpenAll = document.getElementById('btn-hub-open-all');
+  if (btnHubOpenAll) {
+    btnHubOpenAll.addEventListener('click', (e) => {
+      e.preventDefault();
+      openSection('all');
     });
   }
 
@@ -702,6 +763,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const currentTrack = player.getCurrentTrack();
 
     if (!list || list.length === 0) {
+      if (sectionViewCount) sectionViewCount.textContent = '0 треков';
       emptyStateEl.classList.remove('hidden');
       if (currentTab === 'offline') {
         document.getElementById('empty-title').textContent = 'Нет скачанных треков';
@@ -726,6 +788,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     emptyStateEl.classList.add('hidden');
+    if (sectionViewCount) {
+      const n = Math.abs(list.length) % 100;
+      const n1 = n % 10;
+      let word = 'треков';
+      if (n <= 10 || n >= 20) {
+        if (n1 === 1) word = 'трек';
+        else if (n1 >= 2 && n1 <= 4) word = 'трека';
+      }
+      sectionViewCount.textContent = `${list.length} ${word}`;
+    }
 
     list.forEach((track, index) => {
       const isDownloaded = downloadedTrackIds.has(track.id);

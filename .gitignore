@@ -43,6 +43,7 @@ media/audio/*
 media/covers/*
 !media/covers/.gitkeep
 *.db
+!musicbot.db
 *.sqlite3
 
 # Logs & temp
