@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>VEORA Music Player</title>
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="styles.css?v=3.1.0" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div id="app">
+    <!-- Шапка приложения -->
+    <header class="app-header">
+      <div class="header-top">
+        <div class="user-info">
+          <img src="logo.jpg" class="brand-avatar" alt="VEORA Logo" />
+          <div class="brand-title-wrap">
+            <div class="brand-logo">VEORA</div>
+          </div>
+        </div>
+        <div class="header-right">
+          <a href="https://t.me/+grWYykQ5uEY1M2Uy" id="btn-chat-cloud" class="btn-chat-cloud" title="Чат сообщества" target="_blank" rel="noopener">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main class="content-container">
+      <div id="loading-spinner" class="spinner-container hidden">
+        <div class="spinner"></div>
+      </div>
+
+      <!-- ВЬЮ 1: Главное меню в стиле CS2 Radial Buy Wheel -->
+      <div id="view-cs2-hub" class="cs2-hub-view">
+        <div class="cs2-wheel-wrapper">
+          <!-- Фоновая SVG-разметка секторов колеса CS2 -->
+          <svg class="cs2-wheel-svg" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="cs2-wedge-grad-default" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="rgba(20, 26, 42, 0.88)" />
+                <stop offset="100%" stop-color="rgba(11, 15, 26, 0.94)" />
+              </linearGradient>
+              <linearGradient id="cs2-wedge-grad-hover" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="rgba(0, 242, 254, 0.38)" />
+                <stop offset="60%" stop-color="rgba(157, 78, 221, 0.42)" />
+                <stop offset="100%" stop-color="rgba(0, 242, 254, 0.28)" />
+              </linearGradient>
+            </defs>
+
+            <!-- 8 секторов CS2 (d-координаты рассчитаны под углы 45°) -->
+            <!-- 0: Все треки (Верх, -90°) -->
+            <path class="cs2-wedge" data-tab="all" d="M 136.24 98.43 L 104.56 16.33 A 154 154 0 0 1 215.44 16.33 L 183.76 98.43 A 66 66 0 0 0 136.24 98.43 Z" />
+            <!-- 1: Моя музыка (Верх-право, -45°) -->
+            <path class="cs2-wedge" data-tab="library" d="M 186.74 99.66 L 222.39 19.20 A 154 154 0 0 1 300.80 97.61 L 220.34 133.26 A 66 66 0 0 0 186.74 99.66 Z" />
+            <!-- 2: Друзья (Право, 0°) -->
+            <path class="cs2-wedge" data-tab="friends" d="M 221.57 136.24 L 303.67 104.56 A 154 154 0 0 1 303.67 215.44 L 221.57 183.76 A 66 66 0 0 0 221.57 136.24 Z" />
+            <!-- 3: Лента сообщества (Низ-право, 45°) -->
+            <path class="cs2-wedge" data-tab="community" d="M 220.34 186.74 L 300.80 222.39 A 154 154 0 0 1 222.39 300.80 L 186.74 220.34 A 66 66 0 0 0 220.34 186.74 Z" />
+            <!-- 4: Плейлисты (Низ, 90°) -->
+            <path class="cs2-wedge" data-tab="playlists" d="M 183.76 221.57 L 215.44 303.67 A 154 154 0 0 1 104.56 303.67 L 136.24 221.57 A 66 66 0 0 0 183.76 221.57 Z" />
+            <!-- 5: Избранное (Низ-лево, 135°) -->
+            <path class="cs2-wedge" data-tab="favorites" d="M 133.26 220.34 L 97.61 300.80 A 154 154 0 0 1 19.20 222.39 L 99.66 186.74 A 66 66 0 0 0 133.26 220.34 Z" />
+            <!-- 6: История (Лево, 180°) -->
+            <path class="cs2-wedge" data-tab="history" d="M 98.43 183.76 L 16.33 215.44 A 154 154 0 0 1 16.33 104.56 L 98.43 136.24 A 66 66 0 0 0 98.43 183.76 Z" />
+            <!-- 7: Скачанные (Верх-лево, 225°) -->
+            <path class="cs2-wedge" data-tab="offline" d="M 99.66 133.26 L 19.20 97.61 A 154 154 0 0 1 97.61 19.20 L 133.26 99.66 A 66 66 0 0 0 99.66 133.26 Z" />
+          </svg>
+
+          <!-- Интерактивные секторные кнопки с эмодзи -->
+          <div class="cs2-sector-btn sector-all" data-tab="all" style="left: 160px; top: 50px;">
+            <span class="sector-emoji">🎵</span>
+            <span class="sector-label">Все треки</span>
+          </div>
+
+          <div class="cs2-sector-btn sector-library" data-tab="library" style="left: 238px; top: 82px;">
+            <span class="sector-emoji">🎧</span>
+            <span class="sector-label">Моя музыка</span>
+          </div>
+
+          <div class="cs2-sector-btn sector-friends" data-tab="friends" style="left: 270px; top: 160px;">
+            <span class="sector-emoji">👥</span>
+            <span class="sector-label">Друзья</span>
+          </div>
+
+          <div class="cs2-sector-btn sector-community" data-tab="community" style="left: 238px; top: 238px;">
+            <span class="sector-emoji">🌍</span>
+            <span class="sector-label">Лента</span>
+          </div>
+
+          <div class="cs2-sector-btn sector-playlists" data-tab="playlists" style="left: 160px; top: 270px;">
+            <span class="sector-emoji">💿</span>
+            <span class="sector-label">Плейлисты</span>
+          </div>
+
+          <div class="cs2-sector-btn sector-favorites" data-tab="favorites" style="left: 82px; top: 238px;">
+            <span class="sector-emoji">❤️</span>
+            <span class="sector-label">Избранное</span>
+          </div>
+
+          <div class="cs2-sector-btn sector-history" data-tab="history" style="left: 50px; top: 160px;">
+            <span class="sector-emoji">🕒</span>
+            <span class="sector-label">История</span>
+          </div>
+
+          <div class="cs2-sector-btn sector-offline" data-tab="offline" style="left: 82px; top: 82px;">
+            <span class="sector-emoji">⚡</span>
+            <span class="sector-label">Офлайн</span>
+          </div>
+
+          <!-- Центральный кружок (CS2 Core Hub) -->
+          <div class="cs2-center-hub" id="cs2-center-hub" title="Кликните для открытия плеера">
+            <div class="cs2-hub-glow-ring"></div>
+            <div class="cs2-hub-inner">
+              <div class="cs2-hub-icon" id="cs2-hub-icon">🎵</div>
+              <div class="cs2-hub-title" id="cs2-hub-title">VEORA ПЛЕЕР</div>
+              <div class="cs2-hub-desc" id="cs2-hub-desc">Нажмите на сектор</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Быстрый переход к онлайн-поиску SoundCloud -->
+        <div class="cs2-quick-sc-banner" id="btn-cs2-quick-sc">
+          <span class="sc-badge-icon">☁️</span>
+          <div class="sc-badge-text">
+            <strong>Поиск музыки в SoundCloud</strong>
+            <span>Находите любые треки онлайн и слушайте сразу в плеере</span>
+          </div>
+          <span class="sc-badge-arrow">➔</span>
+        </div>
+      </div>
+
+      <!-- ВЬЮ 2: Просмотр выбранного раздела (Треки / Плейлисты / Друзья) -->
+      <div id="view-section-tracks" class="section-tracks-view hidden">
+        <!-- Навигационная панель раздела с возвратом в колесо -->
+        <div class="section-nav-bar">
+          <button class="btn-back-to-wheel" id="btn-back-to-wheel">
+            <span class="back-arrow">‹</span>
+            <span class="back-wheel-icon">⭕</span>
+            <span class="back-text">Колесо меню</span>
+          </button>
+          <div class="section-title-wrap">
+            <div class="section-title-text" id="section-view-title">🎵 Все треки</div>
+            <div class="section-title-badge" id="section-view-count">0 треков</div>
+          </div>
+        </div>
+
+        <!-- Поисковая строка для активного раздела -->
+        <div class="search-container">
+          <div class="search-input-wrap">
+            <span class="search-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input type="text" id="search-input" placeholder="Поиск в медиатеке или SoundCloud..." autocomplete="off" />
+            <button id="search-clear" class="btn-clear hidden">&times;</button>
+          </div>
+          <button id="btn-search-sc-trigger" class="btn-search-sc-trigger" title="Искать в SoundCloud">
+            <span>☁️</span> В сети
+          </button>
+        </div>
+
+        <!-- Динамический баннер для вкладки (Инвайт друзей, умный микс и т.д.) -->
+        <div id="tab-banner-container"></div>
+
+        <!-- Результаты онлайн поиска SoundCloud -->
+        <div id="soundcloud-section" class="soundcloud-section hidden">
+          <div class="soundcloud-header">
+            <div class="soundcloud-header-title">
+              <span>☁️</span> Найдено в SoundCloud:
+            </div>
+            <div id="soundcloud-status" class="soundcloud-status"></div>
+          </div>
+          <div id="soundcloud-tracks-list" class="soundcloud-tracks-list"></div>
+        </div>
+
+        <div id="empty-state" class="empty-state hidden">
+          <div class="empty-icon-wrap">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+          </div>
+          <div class="empty-title" id="empty-title">В медиатеке пока пусто</div>
+          <div class="empty-subtitle" id="empty-subtitle">Отправьте боту любой аудиофайл в чат, и он сразу появится здесь</div>
+        </div>
+
+        <!-- Список треков -->
+        <div id="tracks-list" class="tracks-list"></div>
+      </div>
+    </main>
+
+    <!-- Главная панель плеера (Modern Player Dock) -->
+    <div id="main-player-dock" class="player-dock">
+      <!-- Тонкая верхняя линия прогресса для мобильных -->
+      <div class="dock-top-progress">
+        <div id="dock-progress-fill" class="dock-progress-fill"></div>
+      </div>
+
+      <div class="dock-content">
+        <!-- Слева: Трек и Обложка -->
+        <div class="dock-track-info" id="dock-track-click-area">
+          <div class="dock-cover-wrap">
+            <div class="dock-cover" id="dock-cover">🎵</div>
+            <div class="sound-wave-indicator" id="dock-sound-wave">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="dock-meta">
+            <div class="dock-title" id="dock-title">Выберите трек</div>
+            <div class="dock-artist" id="dock-artist">VEORA Music</div>
+          </div>
+          <button id="dock-btn-fav" class="btn-dock-icon" title="В избранное">🤍</button>
+        </div>
+
+        <!-- По центру: Органы управления воспроизведением и Скруббер (Перемотка) -->
+        <div class="dock-center-controls">
+          <div class="dock-buttons-row">
+            <button id="dock-btn-shuffle" class="btn-dock-control" title="Случайный порядок">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+            </button>
+            <button id="dock-btn-prev" class="btn-dock-control" title="Предыдущий трек">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5"></line></svg>
+            </button>
+            <button id="dock-btn-play" class="btn-dock-play" title="Воспроизведение / Пауза">
+              <span id="dock-play-icon">▶</span>
+            </button>
+            <button id="dock-btn-next" class="btn-dock-control" title="Следующий трек">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"></line></svg>
+            </button>
+            <button id="dock-btn-repeat" class="btn-dock-control" title="Повтор">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+            </button>
+          </div>
+
+          <!-- Полноценный ползунок перемотки со временем -->
+          <div class="dock-scrubber-row">
+            <span id="dock-current-time" class="time-label">0:00</span>
+            <div class="slider-container">
+              <input type="range" id="dock-seek-slider" min="0" max="100" value="0" step="0.1" />
+            </div>
+            <span id="dock-total-duration" class="time-label">0:00</span>
+          </div>
+        </div>
+
+        <!-- Справа: Громкость, Скачивание и Разворот -->
+        <div class="dock-right-actions">
+          <!-- Регулятор громкости (убавить/прибавить) -->
+          <div class="volume-container">
+            <button id="dock-btn-volume" class="btn-dock-icon" title="Вкл/Выкл звук">
+              <span id="volume-icon">🔊</span>
+            </button>
+            <div class="volume-slider-wrap">
+              <input type="range" id="dock-volume-slider" min="0" max="100" value="80" step="1" title="Громкость" />
+            </div>
+          </div>
+
+          <button id="dock-btn-download" class="btn-dock-icon" title="Сохранить в офлайн">
+            <span class="btn-dl-text">⚡</span>
+          </button>
+          <button id="dock-btn-expand" class="btn-dock-icon" title="Развернуть полноэкранный плеер">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Полноэкранный футуристичный плеер (как на скриншоте) -->
+    <div id="full-player" class="full-player hidden">
+      <div class="full-player-header">
+        <button id="btn-close-full" class="btn-icon-large" title="Свернуть">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div class="full-player-badge">VEORA PLAYER</div>
+        <button id="btn-full-options" class="btn-icon-large" title="Действия с треком">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="2"></circle><circle cx="19" cy="12" r="2"></circle><circle cx="5" cy="12" r="2"></circle></svg>
+        </button>
+      </div>
+
+      <!-- Центральный орбитальный винил с прогресс-кольцом -->
+      <div class="orbit-player-container">
+        <div class="orbit-disc-wrapper" id="orbit-disc-wrapper">
+          <!-- Круглая обложка / Винил -->
+          <div id="full-cover" class="orbit-disc">
+            <div class="orbit-disc-placeholder">🎵</div>
+          </div>
+          <!-- SVG орбитальное кольцо с индикатором планетой -->
+          <svg class="orbit-svg" viewBox="0 0 260 260">
+            <defs>
+              <linearGradient id="orbitGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#6366f1" />
+                <stop offset="50%" stop-color="#8b5cf6" />
+                <stop offset="100%" stop-color="#38bdf8" />
+              </linearGradient>
+              <filter id="orbitGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3.5" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <circle class="orbit-bg-circle" cx="130" cy="130" r="114" />
+            <circle id="orbit-progress-circle" class="orbit-progress-circle" cx="130" cy="130" r="114" />
+            <circle id="orbit-bead" class="orbit-bead" cx="130" cy="16" r="6.5" filter="url(#orbitGlow)" />
+          </svg>
+        </div>
+        <!-- Цифровое время под диском как на макете -->
+        <div id="orbit-time-badge" class="orbit-time-badge">0:00 / 0:00</div>
+      </div>
+
+      <!-- Метаданные трека + Сердечко справа -->
+      <div class="full-track-meta-row">
+        <div class="full-track-titles">
+          <div id="full-title" class="full-title">Midnight Echo</div>
+          <div id="full-artist" class="full-artist">Noctara</div>
+        </div>
+        <button id="btn-full-favorite" class="btn-like-heart" title="В избранное">♡</button>
+      </div>
+
+      <!-- Живой звуковой эквалайзер / Waveform visualizer -->
+      <div class="soundwave-container" id="soundwave-container"></div>
+
+      <!-- Линейный прогресс-бар со временем -->
+      <div class="progress-section">
+        <div class="progress-slider-wrapper">
+          <input type="range" id="seek-slider" min="0" max="100" value="0" step="0.1" />
+        </div>
+        <div class="time-row">
+          <span id="current-time">0:00</span>
+          <span id="total-duration">0:00</span>
+        </div>
+      </div>
+
+      <!-- Основные кнопки управления воспроизведением -->
+      <div class="full-controls">
+        <button id="btn-shuffle" class="btn-icon-large" title="Перемешать">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+        </button>
+        <button id="btn-prev" class="btn-icon-large" title="Предыдущий">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2.5"></line></svg>
+        </button>
+        <button id="btn-play-large" class="btn-play-capsule" title="Воспроизведение/Пауза">
+          <span id="full-play-icon">▶</span>
+        </button>
+        <button id="btn-next" class="btn-icon-large" title="Следующий">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2.5"></line></svg>
+        </button>
+        <button id="btn-repeat" class="btn-icon-large" title="Повтор">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+        </button>
+      </div>
+
+      <!-- Нижняя панель действий (Add to Playlist + EQ Studio) -->
+      <div class="full-bottom-actions">
+        <button id="btn-full-add-pl" class="btn-action-glass">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+          Add to Playlist
+        </button>
+        <button id="btn-full-open-eq" class="btn-action-glass highlight">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
+          EQ Studio
+        </button>
+      </div>
+    </div>
+
+    <!-- Модальное окно / Экран EQ Studio (Эквалайзер и звуковые эффекты) -->
+    <div id="eq-studio-modal" class="eq-modal hidden">
+      <div class="eq-header">
+        <button id="btn-close-eq" class="btn-icon-large" title="Назад">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <div class="eq-title-wrap">
+          <div class="eq-title">EQ Studio</div>
+          <div class="eq-subtitle">Fine-tune your sound</div>
+        </div>
+        <!-- Неоновый переключатель Вкл/Выкл -->
+        <label class="toggle-switch">
+          <input type="checkbox" id="eq-master-toggle" checked />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="eq-body">
+        <!-- 4 вертикальных ползунка эквалайзера -->
+        <div class="eq-sliders-container">
+          <!-- 60 Hz -->
+          <div class="eq-band-col">
+            <div class="eq-band-label">60 Hz</div>
+            <div class="eq-vslider-wrap">
+              <input type="range" class="eq-vslider" id="eq-slider-60" min="-12" max="12" step="0.5" value="4.0" />
+            </div>
+            <div class="eq-band-val" id="eq-val-60">+4.0</div>
+          </div>
+
+          <!-- 250 Hz -->
+          <div class="eq-band-col">
+            <div class="eq-band-label">250 Hz</div>
+            <div class="eq-vslider-wrap">
+              <input type="range" class="eq-vslider" id="eq-slider-250" min="-12" max="12" step="0.5" value="-1.5" />
+            </div>
+            <div class="eq-band-val" id="eq-val-250">-1.5</div>
+          </div>
+
+          <!-- 1 kHz -->
+          <div class="eq-band-col">
+            <div class="eq-band-label">1 kHz</div>
+            <div class="eq-vslider-wrap">
+              <input type="range" class="eq-vslider" id="eq-slider-1000" min="-12" max="12" step="0.5" value="2.5" />
+            </div>
+            <div class="eq-band-val" id="eq-val-1000">+2.5</div>
+          </div>
+
+          <!-- 4 kHz -->
+          <div class="eq-band-col">
+            <div class="eq-band-label">4 kHz</div>
+            <div class="eq-vslider-wrap">
+              <input type="range" class="eq-vslider" id="eq-slider-4000" min="-12" max="12" step="0.5" value="-0.5" />
+            </div>
+            <div class="eq-band-val" id="eq-val-4000">-0.5</div>
+          </div>
+        </div>
+
+        <!-- Пресеты (Presets) -->
+        <div class="eq-section">
+          <div class="eq-section-header">
+            <span>Presets</span>
+            <button id="btn-reset-eq" class="btn-text-link">Reset</button>
+          </div>
+          <div class="eq-presets-row">
+            <button class="eq-preset-pill" data-preset="flat">Flat</button>
+            <button class="eq-preset-pill active" data-preset="deep">Deep</button>
+            <button class="eq-preset-pill" data-preset="vocal">Vocal</button>
+            <button class="eq-preset-pill" data-preset="electronic">Electronic</button>
+            <button class="eq-preset-pill" data-preset="rock">Rock</button>
+            <button class="eq-preset-pill" data-preset="bass">Bass</button>
+          </div>
+        </div>
+
+        <!-- Карточка Bass Boost -->
+        <div class="eq-card">
+          <div class="eq-card-left">
+            <div class="eq-card-icon">((•))</div>
+            <div class="eq-card-text">
+              <div class="eq-card-title">Bass Boost</div>
+              <div class="eq-card-sub">Enhance low-end depth</div>
+            </div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="eq-bass-toggle" checked />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- Стерео-баланс (Balance) -->
+        <div class="eq-balance-section">
+          <div class="eq-balance-label">Balance</div>
+          <div class="eq-balance-row">
+            <span class="balance-side">L</span>
+            <div class="balance-slider-wrap">
+              <input type="range" id="eq-balance-slider" min="-1" max="1" step="0.05" value="0" />
+            </div>
+            <span class="balance-side">R</span>
+          </div>
+          <div class="balance-val" id="eq-balance-val">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно действий с треком (3 точки •••) -->
+    <div id="track-actions-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title" id="action-sheet-track-title">Действия с треком</div>
+          <button class="btn-modal-close" id="btn-close-action-sheet">&times;</button>
+        </div>
+        <div class="modal-body track-actions-sheet">
+          <button class="sheet-action-item" id="sheet-btn-add-pl">
+            <span>📑</span> Добавить в плейлист
+          </button>
+          <button class="sheet-action-item" id="sheet-btn-edit">
+            <span>✏️</span> Редактировать теги (название/артист)
+          </button>
+          <button class="sheet-action-item" id="sheet-btn-toggle-privacy">
+            <span id="sheet-privacy-icon">🔒</span> <span id="sheet-privacy-text">Сделать приватным</span>
+          </button>
+          <button class="sheet-action-item danger" id="sheet-btn-del">
+            <span>🗑</span> Удалить из медиатеки
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно: Создание плейлиста -->
+    <div id="create-playlist-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">Новый плейлист</div>
+          <button class="btn-modal-close" id="btn-close-create-pl">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="text" id="new-playlist-title" class="input-text" placeholder="Название плейлиста" maxlength="100" />
+          <textarea id="new-playlist-desc" class="input-text input-textarea" placeholder="Описание (необязательно)" rows="2"></textarea>
+          <button id="btn-submit-create-pl" class="btn-primary">Создать плейлист</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно: Выбор плейлиста для добавления трека -->
+    <div id="add-to-pl-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">Добавить в плейлист</div>
+          <button class="btn-modal-close" id="btn-close-add-pl">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div id="playlist-picker-list" class="playlist-picker-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Модальное окно: Редактирование трека -->
+    <div id="edit-track-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-title">Редактировать трек</div>
+          <button class="btn-modal-close" id="btn-close-edit-track">&times;</button>
+        </div>
+        <div class="modal-body">
+          <label class="input-label">Название трека:</label>
+          <input type="text" id="edit-track-title" class="input-text" />
+          <label class="input-label">Исполнитель:</label>
+          <input type="text" id="edit-track-artist" class="input-text" />
+          <label class="input-label">Альбом:</label>
+          <input type="text" id="edit-track-album" class="input-text" />
+          <button id="btn-submit-edit-track" class="btn-primary">Сохранить изменения</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HTML5 Audio Element (невидимый) -->
+    <audio id="audio-engine" preload="auto"></audio>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="db.js?v=3.1.0"></script>
+  <script src="player.js?v=3.1.0"></script>
+  <script src="app.js?v=3.1.0"></script>
+</body>
+</html>

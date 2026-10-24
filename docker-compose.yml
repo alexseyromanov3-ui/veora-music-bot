@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: musicbot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-musicuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-musicpassword}
+      POSTGRES_DB: ${POSTGRES_DB:-musicbot}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-musicuser} -d ${POSTGRES_DB:-musicbot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - musicbot-net
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: musicbot-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-musicuser}:${POSTGRES_PASSWORD:-musicpassword}@db:5432/${POSTGRES_DB:-musicbot}
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - media_data:/app/media
+    networks:
+      - musicbot-net
+
+volumes:
+  postgres_data:
+  media_data:
+
+networks:
+  musicbot-net:
+    driver: bridge

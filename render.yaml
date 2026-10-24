@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: veora-music-bot
+    runtime: docker
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: STORAGE_CHANNEL_ID
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
+      - key: SAVE_LOCAL_AUDIO
+        value: "false"
+      - key: DEBUG
+        value: "false"
