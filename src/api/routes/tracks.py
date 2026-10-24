@@ -165,13 +165,33 @@ async def get_track_cover(
     """Возвращает обложку трека, если она была извлечена из ID3-тегов."""
     stmt = select(Track).where(Track.id == track_id)
     track = (await db.execute(stmt)).scalar_one_or_none()
-    if not track or not track.cover_path or not Path(track.cover_path).exists():
-        await db.close()
+    await db.close()
+
+    if not track or not track.cover_path:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Обложка отсутствует")
 
-    cover_path = track.cover_path
-    await db.close()
-    return FileResponse(cover_path, media_type="image/jpeg")
+    raw_path = track.cover_path
+    cover_file = Path(raw_path)
+
+    if not cover_file.exists() or not cover_file.is_file():
+        filename = Path(raw_path).name
+        candidates = [
+            Path(raw_path.lstrip("/\\")),
+            Path("pic") / filename,
+            Path("media/covers") / filename,
+            Path("/app/pic") / filename,
+            Path("/app/media/covers") / filename,
+        ]
+        found = False
+        for cand in candidates:
+            if cand.exists() and cand.is_file():
+                cover_file = cand
+                found = True
+                break
+        if not found:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Обложка отсутствует")
+
+    return FileResponse(str(cover_file), media_type="image/jpeg")
 
 
 @router.post("/{track_id}/favorite")

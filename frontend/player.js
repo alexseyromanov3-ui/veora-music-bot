@@ -233,11 +233,11 @@ class AudioPlayerEngine {
     navigator.mediaSession.playbackState = this.isPlaying ? 'playing' : 'paused';
   }
 
-  setQueue(tracks, startIndex = 0) {
+  setQueue(tracks, startIndex = 0, autoPlay = true) {
     this.queue = [...tracks];
     this.currentIndex = startIndex;
     if (this.queue.length > 0 && startIndex >= 0 && startIndex < this.queue.length) {
-      this.loadTrack(this.queue[this.currentIndex], true);
+      this.loadTrack(this.queue[this.currentIndex], autoPlay);
     }
   }
 
@@ -268,6 +268,11 @@ class AudioPlayerEngine {
 
       if (autoPlay) {
         await this.play();
+      } else {
+        this.isPlaying = false;
+        this.audio.pause();
+        this._updateMediaSessionState();
+        if (this.onStateChange) this.onStateChange(false);
       }
     } catch (err) {
       console.error('Не удалось загрузить трек:', err);

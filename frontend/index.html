@@ -6,7 +6,7 @@
   <title>VEORA Music Player</title>
   <!-- Telegram WebApp SDK -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <link rel="stylesheet" href="styles.css?v=3.1.0" />
+  <link rel="stylesheet" href="styles.css?v=3.2.0" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -123,33 +123,6 @@
               <div class="cs2-hub-title" id="cs2-hub-title">VEORA ПЛЕЕР</div>
               <div class="cs2-hub-desc" id="cs2-hub-desc">Нажмите на сектор</div>
             </div>
-          </div>
-        </div>
-
-        <!-- Быстрый переход к онлайн-поиску SoundCloud -->
-        <div class="cs2-quick-sc-banner" id="btn-cs2-quick-sc">
-          <span class="sc-badge-icon">☁️</span>
-          <div class="sc-badge-text">
-            <strong>Поиск музыки в SoundCloud</strong>
-            <span>Находите любые треки онлайн и слушайте сразу в плеере</span>
-          </div>
-          <span class="sc-badge-arrow">➔</span>
-        </div>
-
-        <!-- Список «Все загруженные треки» прямо на главной странице под колесом -->
-        <div class="cs2-hub-tracks-container" id="cs2-hub-tracks-container">
-          <div class="cs2-hub-tracks-header">
-            <div class="cs2-hub-tracks-title-wrap">
-              <span class="cs2-hub-tracks-icon">🎵</span>
-              <span class="cs2-hub-tracks-title">Все загруженные треки</span>
-              <span class="cs2-hub-tracks-count" id="hub-tracks-count">0</span>
-            </div>
-            <button class="btn-hub-open-all" id="btn-hub-open-all">
-              Все разделы ➔
-            </button>
-          </div>
-          <div class="cs2-hub-tracks-list" id="hub-tracks-list">
-            <!-- Треки подгружаются динамически -->
           </div>
         </div>
       </div>
@@ -371,6 +344,14 @@
         </button>
       </div>
 
+      <!-- Регулятор громкости в полноэкранном плеере -->
+      <div class="full-volume-row">
+        <button id="full-vol-icon" class="btn-vol-icon" title="Вкл/Выкл звук">🔊</button>
+        <div class="full-volume-slider-wrap">
+          <input type="range" id="full-volume-slider" min="0" max="100" value="80" step="1" title="Громкость" />
+        </div>
+      </div>
+
       <!-- Нижняя панель действий (Add to Playlist + EQ Studio) -->
       <div class="full-bottom-actions">
         <button id="btn-full-add-pl" class="btn-action-glass">
@@ -564,8 +545,8 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="db.js?v=3.1.0"></script>
-  <script src="player.js?v=3.1.0"></script>
-  <script src="app.js?v=3.1.0"></script>
+  <script src="db.js?v=3.2.0"></script>
+  <script src="player.js?v=3.2.0"></script>
+  <script src="app.js?v=3.2.0"></script>
 </body>
 </html>

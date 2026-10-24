@@ -71,64 +71,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  async function loadHubTracks() {
-    const hubContainer = document.getElementById('hub-tracks-list');
-    const hubCount = document.getElementById('hub-tracks-count');
-    if (!hubContainer) return;
-
-    try {
-      const resp = await fetch('/api/tracks?limit=30', { headers: getAuthHeaders() });
-      if (!resp.ok) return;
-      const data = await resp.json();
-      const allTracks = Array.isArray(data) ? data : (data.items || []);
-
-      if (hubCount) hubCount.textContent = allTracks.length;
-      if (allTracks.length === 0) {
-        hubContainer.innerHTML = '<div class="hub-empty-hint">Загрузите аудиофайлы боту в чат или найдите через SoundCloud!</div>';
-        return;
-      }
-
-      const curTrack = (typeof player !== 'undefined' && player?.getCurrentTrack) ? player.getCurrentTrack() : null;
-
-      hubContainer.innerHTML = '';
-      allTracks.forEach((track, index) => {
-        const isPlaying = curTrack && curTrack.id === track.id;
-        const item = document.createElement('div');
-        item.className = `hub-track-item ${isPlaying ? 'playing' : ''}`;
-        const coverHtml = track.cover_url
-          ? `<img src="${track.cover_url}" alt="cover" />`
-          : '🎵';
-
-        item.innerHTML = `
-          <div class="hub-track-cover">${coverHtml}</div>
-          <div class="hub-track-details">
-            <div class="hub-track-title">${escapeHtml(track.title)}</div>
-            <div class="hub-track-artist">${escapeHtml(track.artist)}</div>
-          </div>
-          <div class="hub-track-actions">
-            <span class="hub-track-duration">${track.duration ? formatTime(track.duration) : ''}</span>
-            <button class="hub-play-btn" title="Играть">${isPlaying && player?.isPlaying ? '⏸' : '▶️'}</button>
-          </div>
-        `;
-
-        item.addEventListener('click', () => {
-          if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
-          player.setQueue(allTracks, index);
-        });
-
-        hubContainer.appendChild(item);
-      });
-    } catch (e) {
-      console.warn('Ошибка загрузки треков для главного экрана:', e);
-    }
-  }
-
   function openWheelMenu() {
     activeView = 'wheel';
     if (viewCs2Hub) viewCs2Hub.classList.remove('hidden');
     if (viewSectionTracks) viewSectionTracks.classList.add('hidden');
     updateHubPreview(null);
-    loadHubTracks();
     if (tg?.HapticFeedback) tg.HapticFeedback.selectionChanged();
   }
 
@@ -206,13 +153,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  const btnHubOpenAll = document.getElementById('btn-hub-open-all');
-  if (btnHubOpenAll) {
-    btnHubOpenAll.addEventListener('click', (e) => {
-      e.preventDefault();
-      openSection('all');
-    });
-  }
 
   if (btnQuickWheelHeader) {
     btnQuickWheelHeader.addEventListener('click', (e) => {
@@ -733,10 +673,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
 
-      // Если плеер еще пустой, предзагружаем первый трек в режиме готовности
+      // Если плеер еще пустой, предзагружаем первый трек в режиме готовности (строго на паузе)
       if (player.currentIndex === -1 && tracks.length > 0) {
-        player.setQueue(tracks, 0);
-        player.pause(); // держим на паузе до клика пользователя
+        player.setQueue(tracks, 0, false);
       }
 
       // Если поиск по медиатеке не дал результатов, автоматически ищем в SoundCloud
@@ -808,7 +747,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       item.dataset.id = track.id;
 
       const coverHtml = track.cover_url
-        ? `<img src="${track.cover_url}" alt="cover" />`
+        ? `<img src="${track.cover_url}" alt="" onerror="this.onerror=null; this.parentElement.innerHTML='🎵';" />`
         : '🎵';
 
       item.innerHTML = `
@@ -998,7 +937,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             const item = document.createElement('div');
             item.className = 'track-item';
             item.innerHTML = `
-              <div class="track-cover">${track.cover_url ? `<img src="${track.cover_url}" />` : '🎵'}</div>
+              <div class="track-cover">${track.cover_url ? `<img src="${track.cover_url}" alt="" onerror="this.onerror=null; this.parentElement.innerHTML='🎵';" />` : '🎵'}</div>
               <div class="track-details">
                 <div class="track-title">${escapeHtml(track.title)}</div>
                 <div class="track-meta-row">
@@ -1387,6 +1326,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateVolumeIcons(newVol);
   });
 
+  if (fullVolIcon) {
+    fullVolIcon.addEventListener('click', () => {
+      const newVol = player.toggleMute();
+      dockVolumeSlider.value = Math.round(newVol * 100);
+      if (fullVolumeSlider) fullVolumeSlider.value = dockVolumeSlider.value;
+      updateVolumeIcons(newVol);
+    });
+  }
+
   // Инициализация звукового эквалайзера / визуализатора
   const SOUNDWAVE_BARS = 32;
   const waveBars = [];
@@ -1465,7 +1413,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Dock Panel
     dockTitle.textContent = track.title;
     dockArtist.textContent = track.artist;
-    dockCover.innerHTML = track.cover_url ? `<img src="${track.cover_url}" />` : '🎵';
+    dockCover.innerHTML = track.cover_url
+      ? `<img src="${track.cover_url}" alt="" onerror="this.onerror=null; this.parentElement.innerHTML='🎵';" />`
+      : '🎵';
     dockBtnFav.innerHTML = track.is_favorite ? '❤️' : '🤍';
     dockBtnFav.classList.toggle('favorited', track.is_favorite);
     dockTotalDuration.textContent = track.duration ? formatTime(track.duration) : '0:00';
@@ -1475,7 +1425,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     fullTitle.textContent = track.title;
     fullArtist.textContent = track.artist;
     fullCover.innerHTML = track.cover_url
-      ? `<img src="${track.cover_url}" alt="cover" />`
+      ? `<img src="${track.cover_url}" alt="" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'orbit-disc-placeholder\\'>🎵</div>';" />`
       : '<div class="orbit-disc-placeholder">🎵</div>';
     fullBtnFavorite.textContent = track.is_favorite ? '❤️' : '♡';
     fullBtnFavorite.classList.toggle('favorited', track.is_favorite);
@@ -2047,8 +1997,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const data = await resp.json();
         const initTracks = Array.isArray(data) ? data : (data.items || []);
         if (player.currentIndex === -1 && initTracks.length > 0) {
-          player.setQueue(initTracks, 0);
-          player.pause();
+          player.setQueue(initTracks, 0, false);
         }
       }
     } catch (_) {}
