@@ -84,3 +84,14 @@ def test_storage_range_header_parsing() -> None:
     assert StorageService.parse_range_header("bytes=1500-", file_size) is None
     assert StorageService.parse_range_header("bytes=500-200", file_size) is None
     assert StorageService.parse_range_header("invalid", file_size) is None
+
+
+def test_format_content_disposition_cyrillic() -> None:
+    """Проверка формирования RFC 6266/5987 Content-Disposition для русских названий треков."""
+    cyrillic_name = "Король и Шут - Лесник.mp3"
+    header = StorageService.format_content_disposition(cyrillic_name, as_attachment=True)
+    # Проверяем, что заголовок кодируется в latin-1 без UnicodeEncodeError (требование HTTP/Starlette)
+    header_bytes = header.encode("latin-1")
+    assert b"attachment" in header_bytes
+    assert b"filename*=UTF-8''" in header_bytes
+    assert "filename*=UTF-8''%D0%9A%D0%BE%D1%80%D0%BE%D0%BB%D1%8C" in header

@@ -1,4 +1,5 @@
 import os
+import urllib.parse
 import aiofiles
 import httpx
 from pathlib import Path
@@ -20,6 +21,24 @@ class StorageService:
         self.covers_dir = covers_dir
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.covers_dir.mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def format_content_disposition(filename: str, as_attachment: bool = True) -> str:
+        """
+        Формирует RFC 6266 / RFC 5987 заголовок Content-Disposition.
+        Безопасно кодирует кириллические и спецсимволы в UTF-8 percent-encoding,
+        предотвращая UnicodeEncodeError: 'latin-1' codec can't encode character в Starlette.
+        """
+        disposition = "attachment" if as_attachment else "inline"
+        # ASCII fallback для устаревших клиентов
+        ascii_fallback = "".join(
+            c for c in filename if ord(c) < 128 and c not in ('"', '\\', '\r', '\n')
+        ).strip()
+        if not ascii_fallback or ascii_fallback == ".mp3":
+            ascii_fallback = "track.mp3"
+        # RFC 5987 standard UTF-8 name
+        encoded_utf8 = urllib.parse.quote(filename, encoding="utf-8")
+        return f'{disposition}; filename="{ascii_fallback}"; filename*=UTF-8\'\'{encoded_utf8}'
 
     def get_audio_path(self, file_hash: str) -> Path:
         """Возвращает путь к аудиофайлу по его SHA-256 хешу."""
@@ -130,7 +149,7 @@ class StorageService:
 
         if as_attachment:
             safe_name = filename or file_path.name
-            headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+            headers["Content-Disposition"] = self.format_content_disposition(safe_name, as_attachment=True)
 
         if range_bounds:
             start, end = range_bounds
@@ -203,7 +222,7 @@ class StorageService:
             resp_headers["Content-Length"] = tg_resp.headers["content-length"]
         if as_attachment:
             safe_name = filename or "track.mp3"
-            resp_headers["Content-Disposition"] = f'attachment; filename="{safe_name}"'
+            resp_headers["Content-Disposition"] = self.format_content_disposition(safe_name, as_attachment=True)
 
         async def tg_chunk_generator():
             try:
