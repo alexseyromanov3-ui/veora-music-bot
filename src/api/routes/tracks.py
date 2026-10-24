@@ -84,20 +84,26 @@ async def stream_track(
     stmt = select(Track).where(Track.id == track_id)
     track = (await db.execute(stmt)).scalar_one_or_none()
     if not track:
+        await db.close()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Трек не найден")
 
-    if track.file_path and Path(track.file_path).exists():
+    file_path = track.file_path
+    telegram_file_id = track.telegram_file_id
+    mime_type = track.mime_type
+    await db.close()
+
+    if file_path and Path(file_path).exists():
         return storage_service.create_streaming_response(
-            file_path=Path(track.file_path),
+            file_path=Path(file_path),
             range_header=range,
-            mime_type=track.mime_type,
+            mime_type=mime_type,
             as_attachment=False,
         )
-    elif track.telegram_file_id:
+    elif telegram_file_id:
         return await storage_service.create_telegram_proxy_streaming_response(
-            telegram_file_id=track.telegram_file_id,
+            telegram_file_id=telegram_file_id,
             range_header=range,
-            mime_type=track.mime_type,
+            mime_type=mime_type,
             as_attachment=False,
         )
     else:
@@ -119,23 +125,28 @@ async def download_track(
     stmt = select(Track).where(Track.id == track_id)
     track = (await db.execute(stmt)).scalar_one_or_none()
     if not track:
+        await db.close()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Трек не найден")
 
     safe_filename = f"{track.artist} - {track.title}.mp3".replace("/", "_").replace("\\", "_")
+    file_path = track.file_path
+    telegram_file_id = track.telegram_file_id
+    mime_type = track.mime_type
+    await db.close()
 
-    if track.file_path and Path(track.file_path).exists():
+    if file_path and Path(file_path).exists():
         return storage_service.create_streaming_response(
-            file_path=Path(track.file_path),
+            file_path=Path(file_path),
             range_header=None,
-            mime_type=track.mime_type,
+            mime_type=mime_type,
             as_attachment=True,
             filename=safe_filename,
         )
-    elif track.telegram_file_id:
+    elif telegram_file_id:
         return await storage_service.create_telegram_proxy_streaming_response(
-            telegram_file_id=track.telegram_file_id,
+            telegram_file_id=telegram_file_id,
             range_header=None,
-            mime_type=track.mime_type,
+            mime_type=mime_type,
             as_attachment=True,
             filename=safe_filename,
         )
@@ -155,9 +166,12 @@ async def get_track_cover(
     stmt = select(Track).where(Track.id == track_id)
     track = (await db.execute(stmt)).scalar_one_or_none()
     if not track or not track.cover_path or not Path(track.cover_path).exists():
+        await db.close()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Обложка отсутствует")
 
-    return FileResponse(track.cover_path, media_type="image/jpeg")
+    cover_path = track.cover_path
+    await db.close()
+    return FileResponse(cover_path, media_type="image/jpeg")
 
 
 @router.post("/{track_id}/favorite")

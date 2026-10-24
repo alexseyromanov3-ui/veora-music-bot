@@ -1,4 +1,6 @@
 from typing import AsyncGenerator
+from sqlalchemy import text
+from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -7,10 +9,16 @@ from sqlalchemy.ext.asyncio import (
 from src.config import settings
 from src.database.base import Base
 
+engine_kwargs = {
+    "echo": settings.DEBUG,
+    "future": True,
+}
+if "sqlite" in settings.DATABASE_URL:
+    engine_kwargs["poolclass"] = NullPool
+
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.DEBUG,
-    future=True,
+    **engine_kwargs,
 )
 
 AsyncSessionLocal = async_sessionmaker(
@@ -35,6 +43,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Создание всех таблиц (для локальной разработки и тестов)."""
+    """Создание всех таблиц и оптимизация SQLite (WAL-режим, busy_timeout)."""
     async with engine.begin() as conn:
+        if "sqlite" in settings.DATABASE_URL:
+            await conn.execute(text("PRAGMA journal_mode=WAL;"))
+            await conn.execute(text("PRAGMA busy_timeout=5000;"))
         await conn.run_sync(Base.metadata.create_all)
