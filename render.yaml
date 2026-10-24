@@ -9,7 +9,7 @@ services:
       - key: BOT_TOKEN
         sync: false
       - key: STORAGE_CHANNEL_ID
-        sync: false
+        value: "-1004334143448"
       - key: SAVE_LOCAL_AUDIO
         value: "false"
       - key: DEBUG
