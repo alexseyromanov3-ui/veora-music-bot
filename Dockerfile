@@ -32,11 +32,12 @@ COPY alembic.ini .
 COPY alembic ./alembic
 COPY src ./src
 COPY frontend ./frontend
+COPY pic ./pic
 
 # Создаем директории для хранения медиа
-RUN mkdir -p media/audio media/covers media/temp
+RUN mkdir -p media/audio media/covers media/temp pic
 
-EXPOSE 8000
+EXPOSE 8000 10000
 
-# Запуск миграций и основного процесса
-CMD ["sh", "-c", "alembic upgrade head && python -m src.main"]
+# Запуск основного процесса (инициализация БД и запуск Bot + API)
+CMD ["python", "-m", "src.main"]

@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,7 +23,7 @@ class Settings(BaseSettings):
 
     # Сервер FastAPI
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8000
+    API_PORT: int = Field(default=8000, validation_alias=AliasChoices("PORT", "API_PORT"))
     DEBUG: bool = True
 
     # Пути к медиа
@@ -39,6 +41,15 @@ class Settings(BaseSettings):
         self.MEDIA_DIR.mkdir(parents=True, exist_ok=True)
         self.AUDIO_DIR.mkdir(parents=True, exist_ok=True)
         self.COVERS_DIR.mkdir(parents=True, exist_ok=True)
+        Path("./pic").mkdir(parents=True, exist_ok=True)
+
+        # Автоматическая настройка WEBAPP_URL на облачных платформах (Render / Railway)
+        render_url = os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+        if render_url:
+            clean_url = render_url.rstrip("/")
+            if not clean_url.startswith("http"):
+                clean_url = f"https://{clean_url}"
+            self.WEBAPP_URL = f"{clean_url}/webapp"
 
 
 settings = Settings()
