@@ -23,6 +23,7 @@ class SoundCloudService:
     """Сервис поиска и загрузки музыки из SoundCloud с сохранением в Telegram Storage."""
 
     _bot_instance: Optional[Bot] = None
+    _url_cache: Dict[str, int] = {}
 
     @classmethod
     def get_bot(cls) -> Optional[Bot]:
@@ -106,13 +107,22 @@ class SoundCloudService:
                 "preferredcodec": "mp3",
                 "preferredquality": "192",
             }],
+            "postprocessor_args": {
+                "FFmpegExtractAudio": ["-threads", "0"],
+            },
             "outtmpl": outtmpl,
             "quiet": True,
             "noplaylist": True,
             "ignoreerrors": False,
-            "concurrent_fragment_downloads": 4,
+            "concurrent_fragment_downloads": 10,
+            "buffersize": 1024 * 1024,
+            "http_chunk_size": 10485760,
             "socket_timeout": 15,
             "retries": 3,
+            "fragment_retries": 3,
+            "http_headers": {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            },
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -168,6 +178,20 @@ class SoundCloudService:
         bot: Optional[Bot] = None,
     ) -> Tuple[Track, bool]:
         """Скачивает трек из SoundCloud, загружает в Telegram Storage и сохраняет в БД."""
+        # Быстрый поиск в кеше по URL для мгновенного ответа
+        cached_track_id = self._url_cache.get(url)
+        if cached_track_id:
+            cached_track = (await session.execute(select(Track).where(Track.id == cached_track_id))).scalar_one_or_none()
+            if cached_track:
+                user_track_stmt = select(UserTrack).where(
+                    UserTrack.user_id == user_id, UserTrack.track_id == cached_track.id
+                )
+                user_track = (await session.execute(user_track_stmt)).scalar_one_or_none()
+                if not user_track:
+                    session.add(UserTrack(user_id=user_id, track_id=cached_track.id, is_favorite=False))
+                    await session.commit()
+                return cached_track, False
+
         # 1. Скачиваем аудиофайл
         file_bytes, meta = await asyncio.to_thread(self._sync_download, url)
 
@@ -238,6 +262,7 @@ class SoundCloudService:
             except Exception as e:
                 logger.warning(f"Не удалось скачать обложку трека: {e}")
 
+        self._url_cache[url] = track.id
         return track, is_new
 
 
