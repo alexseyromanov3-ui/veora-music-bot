@@ -1,9 +1,10 @@
 import os
+import time
 import urllib.parse
 import aiofiles
 import httpx
 from pathlib import Path
-from typing import AsyncGenerator, Optional, Tuple
+from typing import AsyncGenerator, Dict, Optional, Tuple
 from fastapi import HTTPException, status
 from fastapi.responses import StreamingResponse
 from src.config import settings
@@ -21,6 +22,14 @@ class StorageService:
         self.covers_dir = covers_dir
         self.audio_dir.mkdir(parents=True, exist_ok=True)
         self.covers_dir.mkdir(parents=True, exist_ok=True)
+
+        # Постоянный HTTP-клиент с пулом соединений (HTTP Keep-Alive) для максимальной скорости скачивания
+        self._http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=10.0, read=60.0, write=30.0, pool=30.0),
+            limits=httpx.Limits(max_keepalive_connections=50, max_connections=100, keepalive_expiry=60.0),
+        )
+        # Внутренний кеш путей Telegram: telegram_file_id -> (file_path, expiry_timestamp)
+        self._tg_file_cache: Dict[str, Tuple[str, float]] = {}
 
     @staticmethod
     def format_content_disposition(filename: str, as_attachment: bool = True) -> str:
@@ -108,9 +117,9 @@ class StorageService:
 
     @staticmethod
     async def file_chunk_generator(
-        file_path: Path, start: int, end: int, chunk_size: int = 65536
+        file_path: Path, start: int, end: int, chunk_size: int = 262144
     ) -> AsyncGenerator[bytes, None]:
-        """Асинхронный генератор чанков файла в заданном диапазоне байт."""
+        """Асинхронный генератор чанков файла в заданном диапазоне байт (увеличен до 256KB для скорости)."""
         async with aiofiles.open(file_path, "rb") as f:
             await f.seek(start)
             bytes_left = end - start + 1
@@ -170,6 +179,33 @@ class StorageService:
                 headers=headers,
             )
 
+    async def get_telegram_file_path(self, telegram_file_id: str, bot_token: str) -> str:
+        """Получает и кеширует относительный путь файла в Telegram для исключения повторных getFile запросов."""
+        now = time.time()
+        cached = self._tg_file_cache.get(telegram_file_id)
+        if cached and cached[1] > now:
+            return cached[0]
+
+        get_file_url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={telegram_file_id}"
+        try:
+            resp = await self._http_client.get(get_file_url)
+            if resp.status_code != 200 or not resp.json().get("ok"):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Аудиофайл не найден на серверах Telegram",
+                )
+            file_path = resp.json()["result"]["file_path"]
+            # Кешируем путь на 1 час (3600 секунд)
+            self._tg_file_cache[telegram_file_id] = (file_path, now + 3600)
+            return file_path
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Ошибка связи с Telegram: {str(e)}",
+            )
+
     async def create_telegram_proxy_streaming_response(
         self,
         telegram_file_id: str,
@@ -181,36 +217,27 @@ class StorageService:
     ) -> StreamingResponse:
         """
         Проксирует аудиопоток напрямую из серверов Telegram (api.telegram.org)
-        с честной поддержкой Range (206) и буферизацией без сохранения файла на диск!
+        с использованием пула постоянных соединений, кешированием путей и чанками 256KB
+        для максимальной скорости скачивания и стриминга.
         """
-        get_file_url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={telegram_file_id}"
-        client = httpx.AsyncClient(timeout=30.0)
-        try:
-            resp = await client.get(get_file_url)
-            if resp.status_code != 200 or not resp.json().get("ok"):
-                await client.aclose()
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Аудиофайл не найден на серверах Telegram",
-                )
-            file_path = resp.json()["result"]["file_path"]
-        except HTTPException:
-            raise
-        except Exception as e:
-            await client.aclose()
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Ошибка связи с Telegram: {str(e)}",
-            )
-
+        file_path = await self.get_telegram_file_path(telegram_file_id, bot_token)
         download_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
 
         tg_headers = {}
         if range_header:
             tg_headers["Range"] = range_header
 
-        req = client.build_request("GET", download_url, headers=tg_headers)
-        tg_resp = await client.send(req, stream=True)
+        req = self._http_client.build_request("GET", download_url, headers=tg_headers)
+        tg_resp = await self._http_client.send(req, stream=True)
+
+        # Если Telegram вернул 404/401 (например, просрочился кеш пути), сбрасываем кеш и пробуем еще 1 раз
+        if tg_resp.status_code in (401, 404):
+            await tg_resp.aclose()
+            self._tg_file_cache.pop(telegram_file_id, None)
+            file_path = await self.get_telegram_file_path(telegram_file_id, bot_token)
+            download_url = f"https://api.telegram.org/file/bot{bot_token}/{file_path}"
+            req = self._http_client.build_request("GET", download_url, headers=tg_headers)
+            tg_resp = await self._http_client.send(req, stream=True)
 
         resp_headers = {
             "Accept-Ranges": "bytes",
@@ -226,11 +253,11 @@ class StorageService:
 
         async def tg_chunk_generator():
             try:
-                async for chunk in tg_resp.aiter_bytes(chunk_size=65536):
+                # 256 KB чанки дают высокую пропускную способность без нагрузки на CPU
+                async for chunk in tg_resp.aiter_bytes(chunk_size=262144):
                     yield chunk
             finally:
                 await tg_resp.aclose()
-                await client.aclose()
 
         return StreamingResponse(
             tg_chunk_generator(),

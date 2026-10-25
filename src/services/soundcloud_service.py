@@ -110,6 +110,9 @@ class SoundCloudService:
             "quiet": True,
             "noplaylist": True,
             "ignoreerrors": False,
+            "concurrent_fragment_downloads": 4,
+            "socket_timeout": 15,
+            "retries": 3,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:

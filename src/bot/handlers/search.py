@@ -141,11 +141,14 @@ async def handle_sc_download_callback(call: CallbackQuery, bot: Bot) -> None:
                 bot=bot,
             )
 
-        # Скачиваем аудиофайл для отправки в чат
-        file_bytes, _ = await soundcloud_service._sync_download(item["url"])
-
-        safe_name = f"{track.artist} - {track.title}.mp3"
-        safe_filename = "".join(c for c in safe_name if c.isalnum() or c in (" ", "-", "_", ".")).strip() or "track.mp3"
+        # Если трек уже загружен в Telegram (storage channel), отправляем мгновенно по file_id без повторного скачивания!
+        if track.telegram_file_id:
+            audio_source = track.telegram_file_id
+        else:
+            file_bytes, _ = await asyncio.to_thread(soundcloud_service._sync_download, item["url"])
+            safe_name = f"{track.artist} - {track.title}.mp3"
+            safe_filename = "".join(c for c in safe_name if c.isalnum() or c in (" ", "-", "_", ".")).strip() or "track.mp3"
+            audio_source = BufferedInputFile(file_bytes, filename=safe_filename)
 
         caption = (
             f"✅ **{track.artist} — {track.title}**\n\n"
@@ -155,7 +158,7 @@ async def handle_sc_download_callback(call: CallbackQuery, bot: Bot) -> None:
 
         await bot.send_audio(
             chat_id=call.message.chat.id,
-            audio=BufferedInputFile(file_bytes, filename=safe_filename),
+            audio=audio_source,
             caption=caption,
             title=track.title,
             performer=track.artist,

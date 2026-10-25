@@ -898,16 +898,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!downloadedTrackIds.has(tr.id)) {
               btnDownloadAll.textContent = `⏳ ${i + 1}/${tracks.length}...`;
               try {
-                const r = await fetch(`/api/tracks/${tr.id}/download`, { headers: getAuthHeaders() });
-                if (r.ok) {
-                  const blob = await r.blob();
-                  let coverBlob = null;
-                  if (tr.cover_url) {
-                    try {
-                      const cResp = await fetch(tr.cover_url);
-                      if (cResp.ok) coverBlob = await cResp.blob();
-                    } catch (_) {}
-                  }
+                const [blob, coverBlob] = await Promise.all([
+                  fetch(`/api/tracks/${tr.id}/download`, { headers: getAuthHeaders() }).then((r) => (r.ok ? r.blob() : null)),
+                  tr.cover_url
+                    ? fetch(tr.cover_url).then((r) => (r.ok ? r.blob() : null)).catch(() => null)
+                    : Promise.resolve(null),
+                ]);
+                if (blob) {
                   await offlineDB.saveTrack(tr, blob, coverBlob);
                   downloadedTrackIds.add(tr.id);
                 }
@@ -1251,20 +1248,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (buttonEl) buttonEl.innerHTML = '⏳';
 
     try {
-      const resp = await fetch(`/api/tracks/${track.id}/download`, {
-        headers: getAuthHeaders(),
-      });
-      if (!resp.ok) throw new Error('Сетевая ошибка при скачивании');
-
-      const audioBlob = await resp.blob();
-
-      let coverBlob = null;
-      if (track.cover_url) {
-        try {
-          const coverResp = await fetch(track.cover_url);
-          if (coverResp.ok) coverBlob = await coverResp.blob();
-        } catch (_) {}
-      }
+      // Параллельное скачивание аудио и обложки для максимальной скорости
+      const [audioBlob, coverBlob] = await Promise.all([
+        fetch(`/api/tracks/${track.id}/download`, { headers: getAuthHeaders() }).then(async (r) => {
+          if (!r.ok) throw new Error('Сетевая ошибка при скачивании аудио');
+          return await r.blob();
+        }),
+        track.cover_url
+          ? fetch(track.cover_url)
+              .then((r) => (r.ok ? r.blob() : null))
+              .catch(() => null)
+          : Promise.resolve(null),
+      ]);
 
       await offlineDB.saveTrack(track, audioBlob, coverBlob);
       downloadedTrackIds.add(track.id);
