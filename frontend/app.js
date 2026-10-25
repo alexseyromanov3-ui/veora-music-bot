@@ -153,6 +153,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  const btnRefreshSection = document.getElementById('btn-refresh-section');
+  if (btnRefreshSection) {
+    btnRefreshSection.addEventListener('click', async (e) => {
+      e.preventDefault();
+      btnRefreshSection.classList.add('spinning');
+      if (tg?.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+      try {
+        await loadTabContent(searchInput ? searchInput.value.trim() : '');
+        showToast('🔄 Список треков обновлен');
+      } finally {
+        setTimeout(() => btnRefreshSection.classList.remove('spinning'), 600);
+      }
+    });
+  }
+
+  // Авто-обновление при возврате в приложение (после отправки треков боту)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && activeView === 'section') {
+      loadTabContent(searchInput ? searchInput.value.trim() : '');
+    }
+  });
+
 
   if (btnQuickWheelHeader) {
     btnQuickWheelHeader.addEventListener('click', (e) => {
