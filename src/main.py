@@ -54,7 +54,7 @@ async def run_bot():
         logger.warning(f"Не удалось настроить кнопку меню бота: {e}")
 
     try:
-        await dp.start_polling(bot)
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         await bot.session.close()
 

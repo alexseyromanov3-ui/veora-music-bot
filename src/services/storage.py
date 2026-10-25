@@ -69,11 +69,21 @@ class StorageService:
         return path
 
     async def save_cover(self, file_hash: str, cover_bytes: bytes) -> Path:
-        """Сохраняет обложку на диск."""
+        """Сохраняет обложку на диск (в media/covers и pic/)."""
         path = self.get_cover_path(file_hash)
         async with aiofiles.open(path, "wb") as f:
             await f.write(cover_bytes)
-        return path
+
+        # Гарантируем копию в pic/ для статической раздачи и сохранения
+        pic_path = Path("pic") / f"{file_hash}.jpg"
+        pic_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            async with aiofiles.open(pic_path, "wb") as pf:
+                await pf.write(cover_bytes)
+        except Exception:
+            pass
+
+        return Path(f"/pic/{file_hash}.jpg")
 
     @staticmethod
     def parse_range_header(

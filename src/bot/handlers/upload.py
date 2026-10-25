@@ -1,10 +1,15 @@
 import io
+import logging
 from aiogram import Bot, F, Router
 from aiogram.types import Message
+from sqlalchemy import select
 from src.bot.handlers.common import get_player_keyboard
 from src.config import settings
 from src.database.session import AsyncSessionLocal
+from src.models import User
 from src.services.track_service import track_service
+
+logger = logging.getLogger(__name__)
 
 router = Router(name="upload_router")
 
@@ -186,3 +191,98 @@ async def handle_document_audio_message(message: Message, bot: Bot) -> None:
         await status_msg.edit_text(reply_text, reply_markup=get_player_keyboard(), parse_mode="Markdown")
     except Exception as e:
         await status_msg.edit_text(f"❌ Ошибка обработки: {str(e)}")
+
+
+@router.channel_post(F.audio)
+async def handle_channel_audio_post(message: Message, bot: Bot) -> None:
+    """Автоматическая синхронизация треков, добавленных или пересланных напрямую в канал-хранилище."""
+    audio = message.audio
+    if not audio:
+        return
+
+    # Проверка канала
+    if settings.STORAGE_CHANNEL_ID:
+        try:
+            target_chat_id = int(settings.STORAGE_CHANNEL_ID)
+            if message.chat.id != target_chat_id:
+                return
+        except ValueError:
+            pass
+
+    try:
+        buffer = io.BytesIO()
+        await bot.download(audio, destination=buffer)
+        file_bytes = buffer.getvalue()
+
+        filename = audio.file_name or f"{audio.performer or 'Unknown'} - {audio.title or 'Track'}.mp3"
+
+        async with AsyncSessionLocal() as session:
+            track, is_new = await track_service.process_and_save_audio(
+                session=session,
+                file_bytes=file_bytes,
+                filename=filename,
+                uploader_id=1,
+                telegram_file_id=audio.file_id,
+                telegram_file_unique_id=audio.file_unique_id,
+            )
+
+            # Добавляем трек в библиотеку всех зарегистрированных пользователей
+            users_stmt = select(User.id)
+            user_ids = (await session.execute(users_stmt)).scalars().all()
+            for uid in user_ids:
+                await track_service.add_to_user_library(session, user_id=uid, track_id=track.id)
+
+            logger.info(f"✅ Трек из канала успешно добавлен в базу: {track.artist} - {track.title} (ID: {track.id})")
+    except Exception as e:
+        logger.error(f"❌ Ошибка авто-обработки аудио из канала: {e}", exc_info=True)
+
+
+@router.channel_post(F.document)
+async def handle_channel_document_post(message: Message, bot: Bot) -> None:
+    """Автоматическая синхронизация аудиофайлов-документов из канала-хранилища."""
+    doc = message.document
+    if not doc:
+        return
+
+    is_audio = False
+    if doc.mime_type and doc.mime_type.lower() in SUPPORTED_MIME_TYPES:
+        is_audio = True
+    elif doc.file_name and doc.file_name.lower().endswith((".mp3", ".flac", ".ogg", ".m4a", ".wav")):
+        is_audio = True
+
+    if not is_audio:
+        return
+
+    if settings.STORAGE_CHANNEL_ID:
+        try:
+            target_chat_id = int(settings.STORAGE_CHANNEL_ID)
+            if message.chat.id != target_chat_id:
+                return
+        except ValueError:
+            pass
+
+    try:
+        buffer = io.BytesIO()
+        await bot.download(doc, destination=buffer)
+        file_bytes = buffer.getvalue()
+
+        filename = doc.file_name or "track.mp3"
+
+        async with AsyncSessionLocal() as session:
+            track, is_new = await track_service.process_and_save_audio(
+                session=session,
+                file_bytes=file_bytes,
+                filename=filename,
+                uploader_id=1,
+                telegram_file_id=doc.file_id,
+                telegram_file_unique_id=doc.file_unique_id,
+            )
+
+            users_stmt = select(User.id)
+            user_ids = (await session.execute(users_stmt)).scalars().all()
+            for uid in user_ids:
+                await track_service.add_to_user_library(session, user_id=uid, track_id=track.id)
+
+            logger.info(f"✅ Документ-аудио из канала успешно добавлен: {track.artist} - {track.title} (ID: {track.id})")
+    except Exception as e:
+        logger.error(f"❌ Ошибка авто-обработки документа из канала: {e}", exc_info=True)
